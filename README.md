@@ -20,22 +20,23 @@ sub-add 00ae c002 1000
 
 * Configure gateway cloud credentials by editing `username` and `password` variables in `gateway.py`
 
-* Now you can start device and gateway with their tokens like,
+* Now you can start device and gateway with their tokens like
 
 ```
 ./gateway.py 159d79164ebff7f1
 ```
-
+and
 ```
 ./device.py 62cb5d464413e5c7
 ```
+in different terminals (or different machines)
 
 * The device should be emitting status every 15 secs and gateway should forward that to the cloud.
 
-You should be able to see data in the cloud like (change the name of the `example-app`)
+You should be able to see data in the cloud by running (change the name of the `example-app`)
 
 ```
 websocat wss://ws-integration.sandbox.drogue.cloud/example-app -H="Authorization: Bearer $(drg whoami -t)" | jq '.data_base64 |= @base64d'
 ```
 
-* You can provision a third device next and use it change a state of the `00aa` device using `test-mesh`
+* You can provision a third mesh device next and use it to change a state of the `00aa` device using `test-mesh` utility
