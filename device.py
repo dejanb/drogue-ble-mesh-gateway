@@ -9,6 +9,7 @@ import dbus
 import dbus.service
 import dbus.exceptions
 import sys
+import os
 
 try:
   from termcolor import colored, cprint
@@ -29,8 +30,12 @@ def main():
 	DBusGMainLoop(set_as_default=True)
 	blemesh.bus = dbus.SystemBus()
 
-	if len(sys.argv) > 1 :
-		blemesh.set_token(sys.argv[1])
+	token = os.environ.get('TOKEN')
+	if token is None:
+		print("'TOKEN' variable not set")
+		sys.exit(1)
+
+	blemesh.set_token(token)
 
 	blemesh.mesh_net = dbus.Interface(blemesh.bus.get_object(blemesh.MESH_SERVICE_NAME,
 						"/org/bluez/mesh"),
@@ -59,9 +64,6 @@ def main():
 	blemesh.app.add_element(second_ele)
 
 	blemesh.mainloop = GLib.MainLoop()
-
-	print('Attaching')
-	#blemesh.attach(int('62cb5d464413e5c7', 16))
 	blemesh.attach(blemesh.token)
 	blemesh.mainloop.run()
 

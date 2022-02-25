@@ -237,14 +237,18 @@ def interfaces_removed_cb(object_path, interfaces):
 		print('Service was removed')
 		app_exit()
 
+def get_state_str(state):
+	if state == 0:
+		return 'OFF'
+	elif state == 1:
+		return 'ON'
+	else:
+		return 'UNKNOWN'
+
 def print_state(state):
 	print('State is ', end='')
-	if state == 0:
-		print('OFF')
-	elif state == 1:
-		print('ON')
-	else:
-		print('UNKNOWN')
+	print(get_state_str(state))
+
 class ModTimer():
 	def __init__(self):
 		self.seconds = None
@@ -490,9 +494,6 @@ class Model():
 
 	def send_publication(self, data):
 		pub_opts = dbus.Dictionary(signature='sv')
-
-		print('Send publication ', end='')
-		print(data)
 		node.Publish(self.path, self.model_id, pub_opts, data,
 						reply_handler=generic_reply_cb,
 						error_handler=generic_error_cb)
@@ -611,7 +612,7 @@ class OnOffServer(Model):
 		self.pub_timer.start(period/1000, self.publish)
 
 	def publish(self):
-		print('Publish')
+		print('Publish: state=' + get_state_str(self.state))
 		data = struct.pack('>HB', 0x8204, self.state)
 		self.send_publication(data)
 
@@ -667,12 +668,7 @@ class OnOffClient(Model):
 			return
 
 		print(set_yellow('Got state '), end = '')
-
-		state_str = "ON"
-		if state == 0:
-			state_str = "OFF"
-
-		print(set_green(state_str), set_yellow('from'),
+		print(set_green(get_state_str(state)), set_yellow('from'),
 						set_green('%04x' % source))
 
 ########################

@@ -20,6 +20,7 @@ import dbus.exceptions
 import paho.mqtt.client as mqtt
 import time
 import ssl
+import os
 
 try:
   from termcolor import colored, cprint
@@ -78,7 +79,7 @@ class GatewayOnOffServer(blemesh.Model):
 
 		print(set_green(state_str), set_yellow('from'),
 						set_green('%04x' % source))
-		client.publish("gateway", "{state:" + state_str + "}")
+		client.publish("ble_gateway", "{state:" + state_str + "}")
 
 	def t_track(self):
 			self.t_timer.cancel()
@@ -100,21 +101,28 @@ class GatewayOnOffServer(blemesh.Model):
 		self.pub_timer.start(period/1000, self.publish)
 
 	def publish(self):
-		print('Publish')
 		data = struct.pack('>HB', 0x8204, self.state)
 		self.send_publication(data)
 
 
 def main():
-
 	global client
 
-	broker ="mqtt.sandbox.drogue.cloud"
-	port = 8883
+	token = os.environ.get('TOKEN')
+	if token is None:
+		print("'TOKEN' variable not set")
+		sys.exit(1)
 
-	username = "device1@example-app"
-	password = "hey-rodney"
-	topic = "temp"
+	blemesh.set_token(token)
+
+	broker = os.environ.get('DROGUE_MQTT_HOST', 'mqtt.sandbox.drogue.cloud')
+	port = os.environ.get('DROGUE_MQTT_PORT', 8883)
+
+	username = os.environ.get('DROGUE_DEVICE', 'device1@dejanb')
+	password = os.environ.get('DROGUE_PASSWORD', 'hey-rodney')
+
+	print(set_yellow('Drogue endpint: ' + broker + ':' + str(port)))
+	print(set_yellow('Drogue device: ' + username))
 
 # def on_connect(client, userdata, flags, rc):
 #     if rc == 0:
@@ -131,10 +139,6 @@ def main():
 
 	DBusGMainLoop(set_as_default=True)
 	blemesh.bus = dbus.SystemBus()
-
-	if len(sys.argv) > 1 :
-		blemesh.set_token(sys.argv[1])
-
 	blemesh.mesh_net = dbus.Interface(blemesh.bus.get_object(blemesh.MESH_SERVICE_NAME,
 						"/org/bluez/mesh"),
 						blemesh.MESH_NETWORK_IFACE)
@@ -160,10 +164,8 @@ def main():
 
 	blemesh.app.add_element(first_ele)
 	blemesh.app.add_element(second_ele)
-
 	blemesh.mainloop = GLib.MainLoop()
 
-	print('Attaching')
 	blemesh.attach(blemesh.token)
 	blemesh.mainloop.run()
 

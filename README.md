@@ -18,16 +18,17 @@ pub-set 00aa C002 0 50 5 1000
 sub-add 00ae c002 1000
 ```
 
-* Configure gateway cloud credentials by editing `username` and `password` variables in `gateway.py`
-
-* Now you can start device and gateway with their tokens like
+* Now you can start gateway
 
 ```
-./gateway.py 159d79164ebff7f1
+TOKEN=159d79164ebff7f1 DROGUE_DEVICE=device1@xxx DROGUE_PASSWORD=xxx ./gateway.py
 ```
-and
+You should use proper Drogue cloud device device and password.
+
+* And the device
+
 ```
-./device.py 62cb5d464413e5c7
+TOKEN=62cb5d464413e5c7 ./device.py
 ```
 in different terminals (or different machines)
 
