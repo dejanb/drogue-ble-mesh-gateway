@@ -21,6 +21,7 @@ import paho.mqtt.client as mqtt
 import time
 import ssl
 import os
+import json
 
 try:
   from termcolor import colored, cprint
@@ -105,6 +106,37 @@ class GatewayOnOffServer(blemesh.Model):
 		self.send_publication(data)
 
 
+def on_connect(client, userdata, flags, rc):
+	if rc == 0:
+		print("Connected to Drogue cloud!")
+		client.subscribe("command/inbox/#")
+		client.on_message = on_message
+	else:
+		print("Failed to connect, return code %d\n", rc)
+
+def on_publish(client, userdata, result):
+
+	print("Published!")
+
+def on_message(client, userdata, msg):
+	print(msg.topic + " " + str(msg.payload))
+	#TODO check command and target device
+
+	state = -1
+	command = json.loads(msg.payload.decode("utf-8"))
+	if not command["state"] is None:
+		if command["state"].lower() == "on":
+			state = 1
+		elif command["state"].lower() == "off":
+			state = 0
+		else:
+			state = -1
+
+	print("state: " + str(state))
+
+	if state != -1:
+		blemesh.app.elements[1].models[0].set_state(0x00aa, 0, state)
+
 def main():
 	global client
 
@@ -118,23 +150,19 @@ def main():
 	broker = os.environ.get('DROGUE_MQTT_HOST', 'mqtt.sandbox.drogue.cloud')
 	port = os.environ.get('DROGUE_MQTT_PORT', 8883)
 
-	username = os.environ.get('DROGUE_DEVICE', 'device1@dejanb')
+	username = os.environ.get('DROGUE_DEVICE', 'device1@example')
 	password = os.environ.get('DROGUE_PASSWORD', 'hey-rodney')
 
 	print(set_yellow('Drogue endpint: ' + broker + ':' + str(port)))
 	print(set_yellow('Drogue device: ' + username))
 
-# def on_connect(client, userdata, flags, rc):
-#     if rc == 0:
-#         print("Connected to MQTT Broker!")
-#     else:
-#         print("Failed to connect, return code %d\n", rc)
-
 	client = mqtt.Client("drogue_gateway")
-	#client.on_connect = on_connect
+	client.on_connect = on_connect
+	client.on_publish = on_publish
 	client.username_pw_set(username, password)
 	client.tls_set(cert_reqs=ssl.CERT_NONE)
 	client.connect(broker, port)
+	client.loop_start()
 
 
 	DBusGMainLoop(set_as_default=True)
