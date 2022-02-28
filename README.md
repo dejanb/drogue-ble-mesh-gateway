@@ -40,4 +40,8 @@ You should be able to see data in the cloud by running (change the name of the `
 websocat wss://ws-integration.sandbox.drogue.cloud/example-app -H="Authorization: Bearer $(drg whoami -t)" | jq '.data_base64 |= @base64d'
 ```
 
-* You can provision a third mesh device next and use it to change a state of the `00aa` device using `test-mesh` utility
+* You can change the state of the device by sending a command to it, like
+
+```
+echo '{"state":"ON"}' | http POST https://api.sandbox.drogue.cloud/api/command/v1alpha1/apps/example-app/devices/device1 command==set-status "Authorization:Bearer $(drg whoami -t)"
+```
