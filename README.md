@@ -2,6 +2,16 @@
 
 ## Getting started
 
+* Create Drogue cloud application, gateway and device
+
+```
+drg create app ble-demo
+drg create device --app ble-demo gateway
+drg set password --app ble-demo gateway hey-rodney
+drg create device --app ble-demo 00aa
+drg set gateway --app ble-demo 00aa gateway
+```
+
 * Initialize two devices using this procedure https://gist.github.com/dejanb/85282932d08d26dce2c9323b3d0cc1e2 and save the token.
 
 Generate pub/sub connection between them. Let's say the first device have address `00aa` and the other one `00ae`, `00aa` will simulate a device and `00ae` a gateway.
@@ -21,9 +31,9 @@ sub-add 00ae c002 1000
 * Now you can start gateway
 
 ```
-TOKEN=159d79164ebff7f1 DROGUE_DEVICE=device1@xxx DROGUE_PASSWORD=xxx ./gateway.py
+TOKEN=159d79164ebff7f1 DROGUE_DEVICE=device1@app DROGUE_PASSWORD=pass ./gateway.py
 ```
-You should use proper Drogue cloud device device and password.
+You should use proper Drogue cloud device device and password. The default values are set according to the example above (e.g. `gateway@ble-demo`)
 
 * And the device
 
