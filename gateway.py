@@ -123,7 +123,17 @@ def on_publish(client, userdata, result):
 
 def on_message(client, userdata, msg):
 	print(msg.topic + " " + str(msg.payload))
-	#TODO check command and target device
+
+	segments = msg.topic.split("/")
+	if len(segments) != 4:
+		print("Not properly formatted topic")
+		return
+
+	if segments[3] != "set-state":
+		print("Command not recognized")
+		return
+
+	device = int(segments[2], 16)
 
 	state = -1
 	command = json.loads(msg.payload.decode("utf-8"))
@@ -138,7 +148,7 @@ def on_message(client, userdata, msg):
 	print("state: " + str(state))
 
 	if state != -1:
-		blemesh.app.elements[1].models[0].set_state(0x00aa, 0, state)
+		blemesh.app.elements[1].models[0].set_state(device, 0, state)
 
 def main():
 	global client

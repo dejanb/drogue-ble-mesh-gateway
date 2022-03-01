@@ -53,5 +53,5 @@ websocat wss://ws-integration.sandbox.drogue.cloud/ble-demo -H="Authorization: B
 * You can change the state of the device by sending a command to it, like
 
 ```
-echo '{"state":"ON"}' | http POST https://api.sandbox.drogue.cloud/api/command/v1alpha1/apps/ble-demo/devices/00aa command==set-status "Authorization:Bearer $(drg whoami -t)"
+echo '{"state":"ON"}' | http POST https://api.sandbox.drogue.cloud/api/command/v1alpha1/apps/ble-demo/devices/00aa command==set-state "Authorization:Bearer $(drg whoami -t)"
 ```
