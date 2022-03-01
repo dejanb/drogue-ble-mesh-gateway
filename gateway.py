@@ -68,9 +68,9 @@ class GatewayOnOffServer(blemesh.Model):
 
 		# print('opcode ' + opcode)
 
-		# if opcode != 0x8204 :
-		# 	# The opcode is not recognized by this model
-		# 	return
+		if opcode != 0x8204 :
+			# The opcode is not recognized by this model
+			return
 
 		print(set_yellow('Sending state '), end = '')
 
@@ -80,7 +80,10 @@ class GatewayOnOffServer(blemesh.Model):
 
 		print(set_green(state_str), set_yellow('from'),
 						set_green('%04x' % source))
-		client.publish("ble_gateway", "{state:" + state_str + "}")
+		device = '%04x' % source
+		print("topic: ble_gateway/" + device)
+		#TODO Handle failures
+		client.publish("ble_gateway/" + device, "{state:" + state_str + "}")
 
 	def t_track(self):
 			self.t_timer.cancel()
@@ -150,7 +153,7 @@ def main():
 	broker = os.environ.get('DROGUE_MQTT_HOST', 'mqtt.sandbox.drogue.cloud')
 	port = os.environ.get('DROGUE_MQTT_PORT', 8883)
 
-	username = os.environ.get('DROGUE_DEVICE', 'device1@example')
+	username = os.environ.get('DROGUE_DEVICE', 'gateway@ble-demo')
 	password = os.environ.get('DROGUE_PASSWORD', 'hey-rodney')
 
 	print(set_yellow('Drogue endpint: ' + broker + ':' + str(port)))

@@ -44,14 +44,14 @@ in different terminals (or different machines)
 
 * The device should be emitting status every 15 secs and gateway should forward that to the cloud.
 
-You should be able to see data in the cloud by running (change the name of the `example-app`)
+You should be able to see data in the cloud by running
 
 ```
-websocat wss://ws-integration.sandbox.drogue.cloud/example-app -H="Authorization: Bearer $(drg whoami -t)" | jq '.data_base64 |= @base64d'
+websocat wss://ws-integration.sandbox.drogue.cloud/ble-demo -H="Authorization: Bearer $(drg whoami -t)" | jq '.data_base64 |= @base64d'
 ```
 
 * You can change the state of the device by sending a command to it, like
 
 ```
-echo '{"state":"ON"}' | http POST https://api.sandbox.drogue.cloud/api/command/v1alpha1/apps/example-app/devices/device1 command==set-status "Authorization:Bearer $(drg whoami -t)"
+echo '{"state":"ON"}' | http POST https://api.sandbox.drogue.cloud/api/command/v1alpha1/apps/ble-demo/devices/00aa command==set-status "Authorization:Bearer $(drg whoami -t)"
 ```
