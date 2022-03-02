@@ -1,6 +1,10 @@
-FROM python:3.10-bullseye
+FROM python:3.10-slim
 
-RUN apt-get update && apt-get install -y \
+# add testing repo to pick up bluez 5.62
+# NOTE: picking up dbus from there, too
+COPY testing-source.list /etc/apt/sources.list.d/
+
+RUN apt-get update && apt-get install -t testing -y \
     bluez \
     bluez-meshd \
     dbus
