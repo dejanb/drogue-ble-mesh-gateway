@@ -9,5 +9,10 @@ RUN apt-get update && apt-get install -t testing -y \
     bluez-meshd \
     dbus
 
+RUN rm -rf /var/lib/bluetooth/mesh
+
+COPY mesh /var/lib/bluetooth/mesh
+
 COPY entrypoint.sh .
+
 CMD ./entrypoint.sh
