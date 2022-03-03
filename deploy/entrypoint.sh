@@ -1,8 +1,7 @@
 #!/bin/bash
 
 service dbus start
-#service bluetooth start
+service bluetooth-mesh start
 
-/usr/libexec/bluetooth/bluetooth-meshd --nodetach --debug
-
-
+# We'll eventually replace this with the python gateway
+tail -f /dev/null
