@@ -11,25 +11,14 @@ import dbus.exceptions
 from threading import Timer
 import time
 import uuid
+import logging
+import logging.handlers
 
 try:
   from gi.repository import GLib
 except ImportError:
   import glib as GLib
 from dbus.mainloop.glib import DBusGMainLoop
-
-try:
-  from termcolor import colored, cprint
-  set_error = lambda x: colored('!' + x, 'red', attrs=['bold'])
-  set_cyan = lambda x: colored(x, 'cyan', attrs=['bold'])
-  set_green = lambda x: colored(x, 'green', attrs=['bold'])
-  set_yellow = lambda x: colored(x, 'yellow', attrs=['bold'])
-except ImportError:
-  print('!!! Install termcolor module for better experience !!!')
-  set_error = lambda x: x
-  set_cyan = lambda x: x
-  set_green = lambda x: x
-  set_yellow = lambda x: x
 
 # Provisioning agent
 try:
@@ -64,6 +53,7 @@ mainloop = None
 node = None
 node_mgr = None
 mesh_net = None
+log = None
 
 dst_addr = 0x0000
 app_idx = 0
@@ -120,6 +110,27 @@ def app_exit():
 				model.timer.cancel()
 	mainloop.quit()
 
+def configure_logging(name):
+	global log
+	# Change root logger level from WARNING (default) to NOTSET in order for all messages to be delegated.
+	logging.getLogger().setLevel(logging.NOTSET)
+
+	# Add stdout handler, with level INFO
+	console = logging.StreamHandler(sys.stdout)
+	console.setLevel(logging.INFO)
+	formater = logging.Formatter('%(asctime)s %(name)-13s: %(levelname)-8s %(message)s')
+	console.setFormatter(formater)
+	logging.getLogger().addHandler(console)
+
+	# Add file rotating handler, with level DEBUG
+	rotatingHandler = logging.handlers.RotatingFileHandler(filename=name + '.log', maxBytes=100000, backupCount=5)
+	rotatingHandler.setLevel(logging.DEBUG)
+	formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+	rotatingHandler.setFormatter(formatter)
+	logging.getLogger().addHandler(rotatingHandler)
+
+	log = logging.getLogger("app." + name)
+
 def set_token(str_value):
 	global token
 	global have_token
@@ -131,7 +142,7 @@ def set_token(str_value):
 	try:
 		input_number = int(str_value, 16)
 	except ValueError:
-		raise_error('Not a valid hexadecimal number')
+		log.error('Not a valid hexadecimal number')
 		return
 
 	token = numpy.uint64(input_number)
@@ -155,32 +166,32 @@ def array_to_string(b_array):
 	return str_value
 
 def generic_error_cb(error):
-	print(set_error('D-Bus call failed: ') + str(error))
+	log.error('D-Bus call failed: ' + str(error))
 
 def generic_reply_cb():
 	return
 
 def attach_app_error_cb(error):
-	print(set_error('Failed to register application: ') + str(error))
+	log.error('Failed to register application: ' + str(error))
 
 def attach(token):
-	print('Attach mesh node to bluetooth-meshd daemon')
+	log.info('Attach mesh node to bluetooth-meshd daemon')
 
 	mesh_net.Attach(app.get_path(), token,
 					reply_handler=attach_app_cb,
 					error_handler=attach_app_error_cb)
 
 def join_cb():
-	print('Join procedure started')
+	log.info('Join procedure started')
 
 def join_error_cb(reason):
-	print('Join procedure failed: ', reason)
+	log.info('Join procedure failed: %s', reason)
 
 def remove_node_cb():
 	global attached
 	global have_token
 
-	print(set_yellow('Node removed'))
+	log.info('Node removed')
 	attached = False
 	have_token = False
 
@@ -199,7 +210,7 @@ def unwrap(item):
 	if isinstance(item, (dbus.Dictionary, dict)):
 		return dict([(unwrap(x), unwrap(y)) for x, y in item.items()])
 
-	print(set_error('Dictionary item not handled: ') + type(item))
+	log.error('Dictionary item not handled: ' + type(item))
 
 	return item
 
@@ -208,7 +219,7 @@ def attach_app_cb(node_path, dict_array):
 
 	attached = True
 
-	print(set_yellow('Mesh app registered: ') + set_green(node_path))
+	log.info('Mesh app registered: ' + node_path)
 
 	obj = bus.get_object(MESH_SERVICE_NAME, node_path)
 
@@ -228,13 +239,13 @@ def attach_app_cb(node_path, dict_array):
 		element.set_model_config(models)
 
 def interfaces_removed_cb(object_path, interfaces):
-	print('Removed')
+	log.info('Removed')
 	if not mesh_net:
 		return
 
 	print(object_path)
 	if object_path == mesh_net[2]:
-		print('Service was removed')
+		log.info('Service was removed')
 		app_exit()
 
 def get_state_str(state):
@@ -362,8 +373,7 @@ class Application(dbus.service.Object):
 		global have_token
 		global attach
 
-		print(set_yellow('Joined mesh network with token ') +
-				set_green(format(value, '016x')))
+		log.info('Joined mesh network with token: ' + format(value, '016x'))
 
 		token = value
 		have_token = True
@@ -371,7 +381,7 @@ class Application(dbus.service.Object):
 	@dbus.service.method(MESH_APPLICATION_IFACE,
 					in_signature="s", out_signature="")
 	def JoinFailed(self, value):
-		print(set_error('JoinFailed '), value)
+		log.error('JoinFailed: %s', value)
 
 
 class Element(dbus.service.Object):
@@ -414,7 +424,6 @@ class Element(dbus.service.Object):
 		props['Models'] = dbus.Array(sig_models, signature='(qa{sv})')
 		props['VendorModels'] = dbus.Array(vendor_models,
 							signature='(qqa{sv})')
-		#print(props)
 		return { MESH_ELEMENT_IFACE: props }
 
 	def add_model(self, model):
@@ -432,14 +441,12 @@ class Element(dbus.service.Object):
 	@dbus.service.method(MESH_ELEMENT_IFACE,
 					in_signature="qqvay", out_signature="")
 	def MessageReceived(self, source, key, dest, data):
-		print(('Message Received on Element %02x') % self.index, end='')
-		print(', src=', format(source, '04x'), end='')
-
 		if isinstance(dest, int):
-			print(', dst=%04x' % dest)
+			dst_str = '%04x' % dest
 		elif isinstance(dest, dbus.Array):
 			dst_str = array_to_string(dest)
-			print(', dst=' + dst_str)
+
+		log.info(('Message Received on Element %02x') % self.index + ', dst=' + dst_str)
 
 		for model in self.models:
 			model.process_message(source, dest, key, data)
@@ -449,12 +456,10 @@ class Element(dbus.service.Object):
 
 	def UpdateModelConfiguration(self, model_id, config):
 		cfg = unwrap(config)
-		print(cfg)
 		self.update_model_config(model_id, cfg)
 
 	def update_model_config(self, model_id, config):
-		print(('Update Model Config '), end='')
-		print(format(model_id, '04x'))
+		log.info('Update Model Config ' + format(model_id, '04x'))
 		for model in self.models:
 			if model_id == model.get_id():
 				model.set_config(config)
@@ -508,26 +513,23 @@ class Model():
 	def set_config(self, config):
 		if 'Bindings' in config:
 			self.bindings = config.get('Bindings')
-			print('Bindings: ', end='')
-			print(self.bindings)
+			log.info('Bindings: ' + str(self.bindings))
 		if 'PublicationPeriod' in config:
 			self.set_publication(config.get('PublicationPeriod'))
-			print('Model publication period ', end='')
-			print(self.pub_period, end='')
-			print(' ms')
+			log.info('Model publication period: ' + str(self.pub_period) + ' ms')
 		if 'Subscriptions' in config:
-			print('Model subscriptions ', end='')
-			self.print_subscriptions(config.get('Subscriptions'))
-			print()
+			log.info('Model subscriptions: ' + self.subscriptions_to_str(config.get('Subscriptions')))
 
-	def print_subscriptions(self, subscriptions):
+	def subscriptions_to_str(self, subscriptions):
+		ret = ''
 		for sub in subscriptions:
 			if isinstance(sub, int):
-				print('%04x,' % sub, end=' ')
+				ret += ('%04x,' % sub) + ' '
 
 			if isinstance(sub, list):
 				label = uuid.UUID(bytes=b''.join(sub))
-				print(label, ',', end=' ')
+				ret += label + ', '
+		return ret
 
 ########################
 # On Off Server Model
@@ -543,9 +545,8 @@ class OnOffServer(Model):
 				 0x8203,  # set unacknowledged
 				 0x8204 } # status
 
-		print("OnOff Server ")
 		self.state = 0
-		print_state(self.state)
+		log.info("OnOff Server: " + get_state_str(self.state))
 		self.pub_timer = ModTimer()
 		self.t_timer = ModTimer()
 
@@ -563,7 +564,7 @@ class OnOffServer(Model):
 			if opcode != 0x8201:
 				# The opcode is not recognized by this model
 				return
-			print('Get state')
+			log.info('Get state')
 		elif datalen == 4:
 			opcode,self.state, tid = struct.unpack('>HBB',
 							       bytes(data))
@@ -571,7 +572,8 @@ class OnOffServer(Model):
 			if opcode != 0x8202 and opcode != 0x8203:
 				# The opcode is not recognized by this model
 				return
-			print_state(self.state)
+
+			log.info("Set state: " + get_state_str(self.state))
 
 			if (self.tid != None and self.tid == tid and
 						self.last_src == source and
@@ -612,7 +614,7 @@ class OnOffServer(Model):
 		self.pub_timer.start(period/1000, self.publish)
 
 	def publish(self):
-		print('Publish: state=' + get_state_str(self.state))
+		log.info('Publish: state=' + get_state_str(self.state))
 		data = struct.pack('>HB', 0x8204, self.state)
 		self.send_publication(data)
 
@@ -628,10 +630,10 @@ class OnOffClient(Model):
 				 0x8202,  # set
 				 0x8203,  # set unacknowledged
 				 0x8204 } # status
-		print('OnOff Client')
+		log.info('OnOff Client')
 
 	def _send_message(self, dest, key, data):
-		print('OnOffClient send command')
+		log.info('OnOffClient send command')
 		self.send_message(dest, key, data)
 
 	def get_state(self, dest, key):
@@ -641,7 +643,7 @@ class OnOffClient(Model):
 
 	def set_state(self, dest, key, state):
 		opcode = 0x8202
-		print('Set state:', state)
+		log.info('Set state: ' + str(state))
 		self.data = struct.pack('>HBB', opcode, state, self.tid)
 		self.tid = (self.tid + 1) % 255
 		self._send_message(dest, key, self.data)
@@ -650,12 +652,11 @@ class OnOffClient(Model):
 		if self.data != None:
 			self._send_message(dest, key, self.data)
 		else:
-			print('No previous command stored')
+			log.info('No previous command stored')
 
 	def process_message(self, source, dest, key, data):
-		print('OnOffClient process message len = ', end = '')
 		datalen = len(data)
-		print(datalen)
+		log.info('OnOffClient process message len = ' + datalen)
 
 		if datalen != 3:
 			# The opcode is not recognized by this model
@@ -667,9 +668,7 @@ class OnOffClient(Model):
 			# The opcode is not recognized by this model
 			return
 
-		print(set_yellow('Got state '), end = '')
-		print(set_green(get_state_str(state)), set_yellow('from'),
-						set_green('%04x' % source))
+		log.info('Got state ' + get_state_str(state) + ' from ' + ('%04x' % source))
 
 ########################
 # Sample Vendor Model

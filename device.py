@@ -11,28 +11,15 @@ import dbus.exceptions
 import sys
 import os
 
-try:
-  from termcolor import colored, cprint
-  set_error = lambda x: colored('!' + x, 'red', attrs=['bold'])
-  set_cyan = lambda x: colored(x, 'cyan', attrs=['bold'])
-  set_green = lambda x: colored(x, 'green', attrs=['bold'])
-  set_yellow = lambda x: colored(x, 'yellow', attrs=['bold'])
-except ImportError:
-  print('!!! Install termcolor module for better experience !!!')
-  set_error = lambda x: x
-  set_cyan = lambda x: x
-  set_green = lambda x: x
-  set_yellow = lambda x: x
-
-
 def main():
+	blemesh.configure_logging("device")
 
 	DBusGMainLoop(set_as_default=True)
 	blemesh.bus = dbus.SystemBus()
 
 	token = os.environ.get('TOKEN')
 	if token is None:
-		print("'TOKEN' variable not set")
+		blemesh.log.error("'TOKEN' variable not set")
 		sys.exit(1)
 
 	blemesh.set_token(token)
@@ -51,13 +38,13 @@ def main():
 	first_ele = blemesh.Element(blemesh.bus, 0x00)
 	second_ele = blemesh.Element(blemesh.bus, 0x01)
 
-	print(set_yellow('Register OnOff Server model on element 0'))
+	blemesh.log.info('Register OnOff Server model on element 0')
 	first_ele.add_model(blemesh.OnOffServer(0x1000))
 
-	print(set_yellow('Register Vendor model on element 0'))
+	blemesh.log.info('Register Vendor model on element 0')
 	first_ele.add_model(blemesh.SampleVendor(0x0001))
 
-	print(set_yellow('Register OnOff Client model on element 1'))
+	blemesh.log.info('Register OnOff Client model on element 1')
 	second_ele.add_model(blemesh.OnOffClient(0x1001))
 
 	blemesh.app.add_element(first_ele)

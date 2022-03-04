@@ -22,19 +22,7 @@ import time
 import ssl
 import os
 import json
-
-try:
-  from termcolor import colored, cprint
-  set_error = lambda x: colored('!' + x, 'red', attrs=['bold'])
-  set_cyan = lambda x: colored(x, 'cyan', attrs=['bold'])
-  set_green = lambda x: colored(x, 'green', attrs=['bold'])
-  set_yellow = lambda x: colored(x, 'yellow', attrs=['bold'])
-except ImportError:
-  print('!!! Install termcolor module for better experience !!!')
-  set_error = lambda x: x
-  set_cyan = lambda x: x
-  set_green = lambda x: x
-  set_yellow = lambda x: x
+import logging
 
 
 ########################
@@ -51,39 +39,29 @@ class GatewayOnOffServer(blemesh.Model):
 				 0x8203,  # set unacknowledged
 				 0x8204 } # status
 
-		print("OnOff Server ")
 		self.state = 0
-		blemesh.print_state(self.state)
+		blemesh.log.info("OnOff Server: " + blemesh.get_state_str(self.state))
 		self.pub_timer = blemesh.ModTimer()
 		self.t_timer = blemesh.ModTimer()
 
 	def process_message(self, source, dest, key, data):
 		datalen = len(data)
-
 		if datalen != 3:
 			# The opcode is not recognized by this model
 			return
 
 		opcode, state = struct.unpack('>HB',bytes(data))
-
-		# print('opcode ' + opcode)
-
 		if opcode != 0x8204 :
 			# The opcode is not recognized by this model
 			return
 
-		print(set_yellow('Sending state '), end = '')
-
-		state_str = "ON"
-		if state == 0:
-			state_str = "OFF"
-
-		print(set_green(state_str), set_yellow('from'),
-						set_green('%04x' % source))
+		state_str = blemesh.get_state_str(state)
 		device = '%04x' % source
-		print("topic: ble_gateway/" + device)
+		topic = "ble_gateway/" + device
+
+		blemesh.log.info("Sending state '" + state_str + "' from device '" + device + "' to MQTT topic '" + topic + "'")
 		#TODO Handle failures
-		client.publish("ble_gateway/" + device, "{state:" + state_str + "}")
+		client.publish(topic, "{state:" + state_str + "}")
 
 	def t_track(self):
 			self.t_timer.cancel()
@@ -111,26 +89,25 @@ class GatewayOnOffServer(blemesh.Model):
 
 def on_connect(client, userdata, flags, rc):
 	if rc == 0:
-		print("Connected to Drogue cloud!")
+		blemesh.log.info("Connected to Drogue cloud!")
 		client.subscribe("command/inbox/#")
 		client.on_message = on_message
 	else:
-		print("Failed to connect, return code %d\n", rc)
+		blemesh.log.error("Failed to connect, return code %d\n", rc)
 
 def on_publish(client, userdata, result):
-
-	print("Published!")
+	blemesh.log.info("Published to cloud")
 
 def on_message(client, userdata, msg):
-	print(msg.topic + " " + str(msg.payload))
+	blemesh.log.info("Received command:" + msg.topic + " - " + str(msg.payload))
 
 	segments = msg.topic.split("/")
 	if len(segments) != 4:
-		print("Not properly formatted topic")
+		blemesh.log.error("Topic %s Not properly formatted", msg.topic)
 		return
 
 	if segments[3] != "set-state":
-		print("Command not recognized")
+		blemesh.log.error("Command %s not recognized", segments[3])
 		return
 
 	device = int(segments[2], 16)
@@ -145,17 +122,19 @@ def on_message(client, userdata, msg):
 		else:
 			state = -1
 
-	print("state: " + str(state))
+	blemesh.log.info("Setting device '" + str('%04x' % device) + "' state to '" + command["state"] + "'")
 
 	if state != -1:
 		blemesh.app.elements[1].models[0].set_state(device, 0, state)
 
 def main():
 	global client
+	global log
+	blemesh.configure_logging("gateway")
 
 	token = os.environ.get('TOKEN')
 	if token is None:
-		print("'TOKEN' variable not set")
+		blemesh.log.error("'TOKEN' variable not set")
 		sys.exit(1)
 
 	blemesh.set_token(token)
@@ -166,8 +145,8 @@ def main():
 	username = os.environ.get('DROGUE_DEVICE', 'gateway@ble-demo')
 	password = os.environ.get('DROGUE_PASSWORD', 'hey-rodney')
 
-	print(set_yellow('Drogue endpint: ' + broker + ':' + str(port)))
-	print(set_yellow('Drogue device: ' + username))
+	blemesh.log.info('Drogue endpoint: ' + broker + ':' + str(port))
+	blemesh.log.info('Drogue device: ' + username)
 
 	client = mqtt.Client("drogue_gateway")
 	client.on_connect = on_connect
@@ -194,13 +173,13 @@ def main():
 	first_ele = blemesh.Element(blemesh.bus, 0x00)
 	second_ele = blemesh.Element(blemesh.bus, 0x01)
 
-	print(set_yellow('Register OnOff Server model on element 0'))
+	blemesh.log.info('Register OnOff Server model on element 0')
 	first_ele.add_model(GatewayOnOffServer(0x1000))
 
-	print(set_yellow('Register Vendor model on element 0'))
+	blemesh.log.info('Register Vendor model on element 0')
 	first_ele.add_model(blemesh.SampleVendor(0x0001))
 
-	print(set_yellow('Register OnOff Client model on element 1'))
+	blemesh.log.info('Register OnOff Client model on element 1')
 	second_ele.add_model(blemesh.OnOffClient(0x1001))
 
 	blemesh.app.add_element(first_ele)
