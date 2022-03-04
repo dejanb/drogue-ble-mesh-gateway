@@ -86,6 +86,77 @@ class GatewayOnOffServer(blemesh.Model):
 		data = struct.pack('>HB', 0x8204, self.state)
 		self.send_publication(data)
 
+########################
+# Sensor Server Model
+########################
+class GatewaySensorServer(blemesh.Model):
+	def __init__(self, model_id):
+		blemesh.Model.__init__(self, model_id)
+		self.tid = None
+		self.last_src = 0x0000
+		self.last_dst = 0x0000
+		self.cmd_ops = { 0x8201,  # get
+				 0x8202,  # set
+				 0x8203,  # set unacknowledged
+				 0x8204 } # status
+
+		self.state = 0
+		#log.info("OnOff Server: " + get_state_str(self.state))
+		self.pub_timer = blemesh.ModTimer()
+		self.t_timer = blemesh.ModTimer()
+
+	def process_message(self, source, dest, key, data):
+		global message_dispatcher
+		datalen = len(data)
+		opcode = bytes(data[0:1])[0]
+		if (opcode == 0x52):
+			format_length_byte = bytes(data[1:2])[0]
+			sensor_data_format = (format_length_byte >> 7)
+			# only Format A is supported
+			if (sensor_data_format == 0):
+				sensor_value_length = ((format_length_byte & 0b01111000) >> 3)
+				id1 = format_length_byte & 0b00000111
+				id2 = bytes(data[2:3])[0]
+				property_id = (id1 << 8) | id2
+				# only temperature data is supported
+				if (property_id == 0x004F):
+					sensor_value = bytes(data[3:4])[0]
+					sensor_value = sensor_value * 0.5
+					device = '%04x' % source
+					topic = "ble_gateway/" + device
+					blemesh.log.info("Sending state '" + str(sensor_value) + "' from device '" + device + "' to MQTT topic '" + topic + "'")
+					#TODO Handle failures
+					print("{temp:" + str(sensor_value) + "}")
+					client.publish(topic, "{temp:" + str(sensor_value) + "}")
+
+	def t_track(self):
+			self.t_timer.cancel()
+			self.tid = None
+			self.last_src = 0x0000
+			self.last_dst = 0x0000
+
+	def set_publication(self, period):
+
+		self.pub_period = period
+		if period == 0:
+			self.pub_timer.cancel()
+			return
+
+		# We do not handle ms in this example
+		if period < 1000:
+			return
+
+		self.pub_timer.start(period/1000, self.publish)
+
+	def create_sensor_data(self, temp):
+		return struct.pack('>BBBB', 0x52, 0x08, 0x4f, int(temp*2))
+
+	def publish(self):
+		temp = uniform(18.0, 23.0)
+		log.info('Publish: temperature=' + str(int(temp*2)/2))
+		data = self.create_sensor_data(temp)
+		self.send_publication(data)
+
 
 def on_connect(client, userdata, flags, rc):
 	if rc == 0:
@@ -175,12 +246,14 @@ def main():
 
 	blemesh.log.info('Register OnOff Server model on element 0')
 	first_ele.add_model(GatewayOnOffServer(0x1000))
+	first_ele.add_model(GatewaySensorServer(0x1100))
 
 	blemesh.log.info('Register Vendor model on element 0')
 	first_ele.add_model(blemesh.SampleVendor(0x0001))
 
 	blemesh.log.info('Register OnOff Client model on element 1')
 	second_ele.add_model(blemesh.OnOffClient(0x1001))
+	second_ele.add_model(blemesh.SensorClient(0x1102))
 
 	blemesh.app.add_element(first_ele)
 	blemesh.app.add_element(second_ele)

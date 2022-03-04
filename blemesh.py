@@ -13,6 +13,7 @@ import time
 import uuid
 import logging
 import logging.handlers
+from random import randrange, uniform
 
 try:
   from gi.repository import GLib
@@ -669,6 +670,102 @@ class OnOffClient(Model):
 			return
 
 		log.info('Got state ' + get_state_str(state) + ' from ' + ('%04x' % source))
+
+########################
+# Sensor Client Model
+########################
+class SensorClient(Model):
+	def __init__(self, model_id):
+		Model.__init__(self, model_id)
+		self.tid = 0
+		self.data = None
+		self.cmd_ops = { 0x52 } # status
+
+	def process_message(self, source, dest, key, data):
+		global message_dispatcher
+		datalen = len(data)
+		opcode = bytes(data[0:1])[0]
+		if (opcode == 0x52):
+			format_length_byte = bytes(data[1:2])[0]
+			sensor_data_format = (format_length_byte >> 7)
+			# only Format A is supported
+			if (sensor_data_format == 0):
+				sensor_value_length = ((format_length_byte & 0b01111000) >> 3)
+				id1 = format_length_byte & 0b00000111
+				id2 = bytes(data[2:3])[0]
+				property_id = (id1 << 8) | id2
+				# only temperature data is supported
+				if (property_id == 0x004F):
+					sensor_value = bytes(data[3:4])[0]
+					sensor_value = sensor_value * 0.5
+					log.info('SensorClient opcode=' + str(hex(opcode)) + ' value=' + str(sensor_value))
+
+########################
+# Sensor Server Model
+########################
+class SensorServer(Model):
+	def __init__(self, model_id):
+		Model.__init__(self, model_id)
+		self.tid = None
+		self.last_src = 0x0000
+		self.last_dst = 0x0000
+		self.cmd_ops = { 0x8201,  # get
+				 0x8202,  # set
+				 0x8203,  # set unacknowledged
+				 0x8204 } # status
+
+		self.state = 0
+		#log.info("OnOff Server: " + get_state_str(self.state))
+		self.pub_timer = ModTimer()
+		self.t_timer = ModTimer()
+
+	def process_message(self, source, dest, key, data):
+		global message_dispatcher
+		datalen = len(data)
+		opcode = bytes(data[0:1])[0]
+		if (opcode == 0x52):
+			format_length_byte = bytes(data[1:2])[0]
+			sensor_data_format = (format_length_byte >> 7)
+			# only Format A is supported
+			if (sensor_data_format == 0):
+				sensor_value_length = ((format_length_byte & 0b01111000) >> 3)
+				id1 = format_length_byte & 0b00000111
+				id2 = bytes(data[2:3])[0]
+				property_id = (id1 << 8) | id2
+				# only temperature data is supported
+				if (property_id == 0x004F):
+					sensor_value = bytes(data[3:4])[0]
+					sensor_value = sensor_value * 0.5
+					log.info('Sensor value=' + str(sensor_value))
+
+	def t_track(self):
+			self.t_timer.cancel()
+			self.tid = None
+			self.last_src = 0x0000
+			self.last_dst = 0x0000
+
+	def set_publication(self, period):
+
+		self.pub_period = period
+		if period == 0:
+			self.pub_timer.cancel()
+			return
+
+		# We do not handle ms in this example
+		if period < 1000:
+			return
+
+		self.pub_timer.start(period/1000, self.publish)
+
+	def create_sensor_data(self, temp):
+		return struct.pack('>BBBB', 0x52, 0x08, 0x4f, int(temp*2))
+
+	def publish(self):
+		temp = uniform(18.0, 23.0)
+		log.info('Publish: temperature=' + str(int(temp*2)/2))
+		data = self.create_sensor_data(temp)
+		self.send_publication(data)
+
 
 ########################
 # Sample Vendor Model
