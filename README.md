@@ -12,7 +12,7 @@ drg create device --app ble-demo 00aa
 drg set gateway --app ble-demo 00aa gateway
 ```
 
-* Initialize two devices using this procedure https://gist.github.com/dejanb/85282932d08d26dce2c9323b3d0cc1e2 and save the token.
+* Initialize two devices using [this procedure](mesh.md).
 
 Generate pub/sub connection between them. Let's say the first device have address `00aa` and the other one `00ae`, `00aa` will simulate a device and `00ae` a gateway.
 
@@ -20,12 +20,15 @@ Generate pub/sub connection between them. Let's say the first device have addres
 
 ```
 pub-set 00aa C002 0 50 5 1000
+pub-set 00aa C002 0 50 5 1100
 ```
 
 * Create a subscription for a gateway.
 
 ```
 sub-add 00ae c002 1000
+sub-add 00ae c002 1100
+
 ```
 
 * Now you can start gateway

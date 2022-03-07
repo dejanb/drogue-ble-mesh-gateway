@@ -17,13 +17,6 @@ def main():
 	DBusGMainLoop(set_as_default=True)
 	blemesh.bus = dbus.SystemBus()
 
-	token = os.environ.get('TOKEN')
-	if token is None:
-		blemesh.log.error("'TOKEN' variable not set")
-		sys.exit(1)
-
-	blemesh.set_token(token)
-
 	blemesh.mesh_net = dbus.Interface(blemesh.bus.get_object(blemesh.MESH_SERVICE_NAME,
 						"/org/bluez/mesh"),
 						blemesh.MESH_NETWORK_IFACE)
@@ -54,7 +47,22 @@ def main():
 	blemesh.app.add_element(second_ele)
 
 	blemesh.mainloop = GLib.MainLoop()
-	blemesh.attach(blemesh.token)
+
+	if (len(sys.argv) == 2):
+		if sys.argv[1] == 'join':
+			blemesh.join()
+		else:
+			blemesh.log.error("Unknown command: " + sys.argv[1])
+			sys.exit(1)
+	else:
+		token = os.environ.get('TOKEN')
+		if token is None:
+			blemesh.log.error("'TOKEN' variable not set")
+			sys.exit(1)
+
+		blemesh.set_token(token)
+		blemesh.attach(blemesh.token)
+
 	blemesh.mainloop.run()
 
 

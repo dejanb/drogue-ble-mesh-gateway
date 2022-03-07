@@ -124,7 +124,7 @@ def configure_logging(name):
 	logging.getLogger().addHandler(console)
 
 	# Add file rotating handler, with level DEBUG
-	rotatingHandler = logging.handlers.RotatingFileHandler(filename=name + '.log', maxBytes=100000, backupCount=5)
+	rotatingHandler = logging.handlers.RotatingFileHandler(filename='logs/' + name + '.log', maxBytes=100000, backupCount=5)
 	rotatingHandler.setLevel(logging.DEBUG)
 	formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 	rotatingHandler.setFormatter(formatter)
@@ -181,6 +181,15 @@ def attach(token):
 	mesh_net.Attach(app.get_path(), token,
 					reply_handler=attach_app_cb,
 					error_handler=attach_app_error_cb)
+
+def join():
+	uuid_bytes = uuid.uuid4().bytes
+	uuid_str = array_to_string(uuid_bytes)
+
+	log.info('Joining with UUID:  ' + uuid_str)
+	mesh_net.Join(app.get_path(), uuid_bytes,
+		reply_handler=join_cb,
+		error_handler=join_error_cb)
 
 def join_cb():
 	log.info('Join procedure started')
